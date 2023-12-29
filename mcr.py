@@ -5,6 +5,14 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 
+import matplotlib.pyplot as plt
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
+
+
 #%% [markdown]
 ## Data Import
 #%%
@@ -24,13 +32,6 @@ data.artists.value_counts()
 # %%
 
 ### Making the pipeline with Scaling the data and then using  Clustering
-
-import matplotlib.pyplot as plt
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
-from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score
 
 # Load your data
 # Assuming your data is stored in a DataFrame named 'data'
@@ -553,11 +554,13 @@ def recommend_songs(song_list, spotify_data, n_songs=10, n_neighbors=10):
     song_center = get_mean_vector(song_list, spotify_data)
     scaled_song_center = knn_pipeline.named_steps['standardscaler'].transform(song_center.reshape(1, -1))
     neighbors = knn_pipeline.predict(scaled_song_center)
-     # Add clustering labels to the original data
-    spotify_data['cluster_label'] = knn_pipeline.predict(X)
+
+    # Add clustering labels to the original data
+    cluster_labels = knn_pipeline.predict(scaled_song_center)
+    # Add clustering labels to the original data
+    spotify_data['cluster_label'] = cluster_labels[0] 
     # Extract indices of the neighbors
     indices = np.argsort(neighbors.flatten())[:n_songs]
-
     # Select recommended songs by index
     rec_songs = spotify_data.iloc[indices]
 
@@ -606,6 +609,7 @@ songs_in_same_cluster = data[data['cluster_label'].isin(cluster_labels)]
 print(songs_in_same_cluster[metadata_cols].to_dict(orient='records'))
 
 
+
 # %%
 from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import StandardScaler
@@ -650,5 +654,77 @@ recommendations = recommend_songs([
 
 print(recommendations)
 
+
+# %%
+
+def func(n,k):
+    if (k==n+1):
+        return
+    print(k,end=' ')
+    func(n,k+1)
+k=1  
+func(5,1)
+# %%
+def func(n,k):
+    if (n==0 or n==1):
+        return k
+    k=k*n 
+    return func(n-1,k)
+print(func(6,1))
+# %%
+def func(k):
+    if(k<=0):
+        return k
+    if k==1:
+        return 0
+    if k==2:
+        return 1
+    return func(k-2)+func(k-1)
+print(func(0))
+# %%
+def func(n):
+    if n<=1:
+        return n 
+    return n+func(n-1)
+print(func(3))
+# %%
+def func(n,k=1):
+    if n==0:
+        return n
+    if n<=1:
+        return k 
+    return func(n-1,n+k)
+print(func(3))
+# %%
+
+
+def func(use_str, last, first=0):
+    if last<=first:
+        return True
+    if(use_str[last]==use_str[first]):
+        print(f"{use_str[last],use_str[first]}")
+        return func(use_str,last-1,first+1)
+    else:
+        print(f"Not palindrome {use_str[last],use_str[first]}")
+        return False
+    
+def palichcekcall(arr):
+        if func(arr,len(arr)-1)==True:
+            print("Yes it is palindrome")
+        else:
+            print("Its not pali")
+
+
+palichcekcall(input(""))
+
+
+
+# %%
+def func(num, sum=0):
+    if num<=0:
+        return sum
+    return func(num//10,num%10+sum)
+func(253)
+# %%
 
 # %%
