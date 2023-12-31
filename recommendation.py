@@ -105,14 +105,58 @@ def flatten_dict_list(dict_list):
 #     # removing the names of the songs which are present in the given list
 #     rec_songs = rec_songs[~rec_songs['name'].isin(song_dict['name'])]
 #     return rec_songs[metadata_cols].to_dict(orient='records')
+
 #%%
 from sklearn.cluster import KMeans
-from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA  # Import PCA
+import numpy as np
+
+def recommend_songs(song_list, spotify_data, n_songs=10, sort_by='popularity'):
+    np.random.seed(42)  # Set the random seed for reproducibility
+    metadata_cols = ['name', 'year', 'artists']
+    
+    song_dict = flatten_dict_list(song_list)
+    song_center = get_mean_vector(song_list, spotify_data)
+    
+    # Use PCA for dimensionality reduction instead of StandardScaler
+    pca = PCA(n_components=len(spotify_data[number_cols].columns))
+    scaled_data = pca.fit_transform(spotify_data[number_cols])
+    scaled_song_center = pca.transform(song_center.reshape(1, -1))
+    
+    # Using k-means clustering with k = n_songs
+    kmeans = KMeans(n_clusters=2 * n_songs, random_state=42)
+    kmeans.fit(scaled_data)
+    
+    # Find the cluster to which the song center belongs
+    cluster_label = kmeans.predict(scaled_song_center)[0]
+    #print("Cluster Label:", cluster_label)
+    
+    # Get the indices of songs in the same cluster
+    index = list(np.where(kmeans.labels_ == cluster_label)[0])
+    #print("Indices in Cluster:", index)
+    
+    # Selecting the n_songs by index
+    rec_songs = spotify_data.iloc[index]
+    
+    # Removing the names of the songs which are present in the given list
+    rec_songs = rec_songs[~rec_songs['name'].isin(song_dict['name'])]
+    
+    # Sort the recommended songs by the specified criteria (e.g., popularity)
+    rec_songs = rec_songs.sort_values(by=sort_by, ascending=False)
+    
+    # Return the top 10 songs
+    rec_songs_top10 = rec_songs.head(n_songs)
+    
+    return rec_songs_top10[metadata_cols].to_dict(orient='records')
+
+#%%
+from sklearn.mixture import GaussianMixture
+from sklearn.preprocessing import MinMaxScaler  # Use MinMaxScaler instead of StandardScaler
 import numpy as np
 
 def recommend_songs(song_list, spotify_data, n_songs=10, sort_by='release_date'):
-    np.random.seed(42)  # Set the random seed for reproducibility
-    scaler = StandardScaler()
+    # np.random.seed(42)  # Set the random seed for reproducibility
+    scaler = MinMaxScaler()  # Use MinMaxScaler instead of StandardScaler
     metadata_cols = ['name', 'year', 'artists']
     
     song_dict = flatten_dict_list(song_list)
@@ -121,15 +165,18 @@ def recommend_songs(song_list, spotify_data, n_songs=10, sort_by='release_date')
     scaled_data = scaler.fit_transform(spotify_data[number_cols])
     scaled_song_center = scaler.fit_transform(song_center.reshape(1, -1))
     
-    # Using k-means clustering with k = n_songs
-    kmeans = KMeans(n_clusters=2*n_songs, random_state=42)
-    kmeans.fit(scaled_data)
+    # Using Gaussian Mixture Models with n_components = n_songs
+    gmm = GaussianMixture(n_components=n_songs, random_state=42)
+    gmm.fit(scaled_data)
     
-    # Find the cluster to which the song center belongs
-    cluster_label = kmeans.predict(scaled_song_center)[0]
+    # Find the cluster probabilities for the song center
+    cluster_probs = gmm.predict_proba(scaled_song_center)[0]
     
+    # Choose the cluster with the highest probability
+    cluster_label = np.argmax(cluster_probs)
+   
     # Get the indices of songs in the same cluster
-    index = list(np.where(kmeans.labels_ == cluster_label)[0])
+    index = list(np.where(gmm.predict(scaled_data) == cluster_label)[0])
     
     # Selecting the n_songs by index
     rec_songs = spotify_data.iloc[index]
@@ -155,13 +202,12 @@ recommend_songs([{'name': 'Needed Me', 'year':2016},
 
 
 #%%
+
 recommend_songs([{'name': 'Come As You Are', 'year':1991},
                 {'name': 'Smells Like Teen Spirit', 'year': 1991},
                 {'name': 'Lithium', 'year': 1992},
                 {'name': 'All Apologies', 'year': 1993},
                 {'name': 'Stay Away', 'year': 1993}],  data)
-
-
 
 #########################################################################################################################################################
 
@@ -174,11 +220,29 @@ recommend_songs([{'name': 'Come As You Are', 'year':1991},
 #     loaded_model = dill.load(file)
 
 # # Use the loaded function
-recommend_songs([{'name': 'Gati Bali', 'year':1921},
-                 {'name': 'Danny Boy', 'year':1921}],  data)
+recommend_songs([{'name': 'Come Back To Erin', 'year':1921},
+                 {'name': 'When We Die', 'year':1921}],  data)
+
+# %%
+recommend_songs([{'name': 'Sweater Weather', 'year':2013},
+                {'name': 'Pompeii', 'year': 2013},
+                {'name': 'You Know You Like It', 'year': 2014},
+                {'name': 'Gucci Gang', 'year': 2017},
+                {'name': 'I <3 My Choppa', 'year': 2017}],  data)
+
+# %%
+data.columns
+# %%
+
+#%%
+# merge_columns=['mode', 'key','energy']
+# data_y=data_by_genre[['mode', 'key','genres','energy']]
+# merged_data = pd.merge(data,data_y , how='inner', on=merge_columns)
+
+
+
 
 # %%
 
-# %%
-data.head()
+
 # %%
