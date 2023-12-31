@@ -148,9 +148,31 @@ plt.show()
 # %%
 pca_result
 # %%
+## Visualizations
 
+import plotly.express as px 
+song_cluster_pipeline = Pipeline([('scalar',StandardScaler()), 
+                                  ('kmeans', KMeans(n_clusters=20, 
+                                   verbose=False))
+                                 ], verbose=False)
 
+X = data.select_dtypes(np.number)
+number_cols = list(X.columns)
+song_cluster_pipeline.fit(X)
+song_cluster_labels = song_cluster_pipeline.predict(X)
+data['cluster_label'] = song_cluster_labels
 
+from sklearn.decomposition import PCA
+
+pca_pipeline = Pipeline([('scalar',StandardScaler()),('PCA', PCA(n_components=2))])
+song_embedding = pca_pipeline.fit_transform(X)
+projection = pd.DataFrame(columns=['x', 'y'], data=song_embedding)
+projection['title'] = data['artists']
+projection['cluster'] = data['cluster_label']
+
+fig = px.scatter(
+    projection, x='x', y='y', color='cluster', hover_data=['x', 'y', 'title'])
+fig.show()
 
 
 
