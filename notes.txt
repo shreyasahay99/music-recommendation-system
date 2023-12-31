@@ -18,3 +18,4 @@ Press CTRL+C to quit
 4) the above indicates that the app has been rendered successfully
 5) click on the link containing the IP address (http://127.0.0.1:5000)
 6) you can now view the app on your browser
+
