@@ -108,7 +108,8 @@ def flatten_dict_list(dict_list):
 
 #%%
 from sklearn.cluster import KMeans
-from sklearn.decomposition import PCA  # Import PCA
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 import numpy as np
 
 def recommend_songs(song_list, spotify_data, n_songs=10, sort_by='popularity'):
@@ -118,22 +119,25 @@ def recommend_songs(song_list, spotify_data, n_songs=10, sort_by='popularity'):
     song_dict = flatten_dict_list(song_list)
     song_center = get_mean_vector(song_list, spotify_data)
     
-    # Use PCA for dimensionality reduction instead of StandardScaler
+    # Use StandardScaler to scale the data
+    scaler = StandardScaler()
+    scaled_data = scaler.fit_transform(spotify_data[number_cols])
+    scaled_song_center = scaler.transform(song_center.reshape(1, -1))
+    
+    # Use PCA for dimensionality reduction
     pca = PCA(n_components=len(spotify_data[number_cols].columns))
-    scaled_data = pca.fit_transform(spotify_data[number_cols])
-    scaled_song_center = pca.transform(song_center.reshape(1, -1))
+    scaled_data_pca = pca.fit_transform(scaled_data)
+    scaled_song_center_pca = pca.transform(scaled_song_center)
     
     # Using k-means clustering with k = n_songs
     kmeans = KMeans(n_clusters=2 * n_songs, random_state=42)
-    kmeans.fit(scaled_data)
+    kmeans.fit(scaled_data_pca)
     
     # Find the cluster to which the song center belongs
-    cluster_label = kmeans.predict(scaled_song_center)[0]
-    #print("Cluster Label:", cluster_label)
+    cluster_label = kmeans.predict(scaled_song_center_pca)[0]
     
     # Get the indices of songs in the same cluster
     index = list(np.where(kmeans.labels_ == cluster_label)[0])
-    #print("Indices in Cluster:", index)
     
     # Selecting the n_songs by index
     rec_songs = spotify_data.iloc[index]
@@ -148,6 +152,7 @@ def recommend_songs(song_list, spotify_data, n_songs=10, sort_by='popularity'):
     rec_songs_top10 = rec_songs.head(n_songs)
     
     return rec_songs_top10[metadata_cols].to_dict(orient='records')
+
 
 #%%
 from sklearn.mixture import GaussianMixture
