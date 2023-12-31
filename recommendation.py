@@ -17,10 +17,10 @@ import pickle
 #%% [markdown]
 ## Data Import
 #%%
-data = pd.read_csv("/Users/shreya/Documents/GitHub/DATS-6103-FA-23-SEC-11/music-recommendation-system/data/data.csv")
-data_by_artist = pd.read_csv("/Users/shreya/Documents/GitHub/DATS-6103-FA-23-SEC-11/music-recommendation-system/data/data_by_artist.csv")
-data_by_year=pd.read_csv("/Users/shreya/Documents/GitHub/DATS-6103-FA-23-SEC-11/music-recommendation-system/data/data_by_year.csv")
-data_by_genre=pd.read_csv("/Users/shreya/Documents/GitHub/DATS-6103-FA-23-SEC-11/music-recommendation-system/data/data_by_genres.csv")
+data = pd.read_csv("/Users/richikghosh/Documents/GitHub/music-recommendation-system/data/data.csv")
+data_by_artist = pd.read_csv("/Users/richikghosh/Documents/GitHub/music-recommendation-system/data/data_by_artist.csv")
+data_by_year=pd.read_csv("/Users/richikghosh/Documents/GitHub/music-recommendation-system/data/data_by_year.csv")
+data_by_genre=pd.read_csv("/Users/richikghosh/Documents/GitHub/music-recommendation-system/data/data_by_genres.csv")
 #data_wt_genre=pd.read_csv("/Users/richikghosh/Documents/GitHub/music-recommendation-system/data/data_w_genres.csv")
 
 #%%
@@ -88,43 +88,62 @@ def flatten_dict_list(dict_list):
     return flattened_dict
 
 # %%
-def recommend_songs( song_list, spotify_data, n_songs=10):
 
-    # metadata_cols = ['name', 'year', 'artists']
-    # song_dict = flatten_dict_list(song_list)
-    # song_center = get_mean_vector(song_list, spotify_data)
-    # scaled_data = StandardScaler().fit_transform(spotify_data[number_cols])
-    # scaled_song_center = StandardScaler().fit_transform(song_center.reshape(1, -1))
+# def recommend_songs( song_list, spotify_data, n_songs=10):
+#     scaler = StandardScaler()
+#     metadata_cols = ['name', 'year', 'artists']
+#     song_dict = flatten_dict_list(song_list)
+#     song_center = get_mean_vector(song_list, spotify_data)
+#     scaled_data = scaler.fit_transform(spotify_data[number_cols])
+#     scaled_song_center = scaler.fit_transform(song_center.reshape(1, -1))
+#     # This finds the euclidean distance
+#     distances = cdist(scaled_song_center, scaled_data, 'cosine')
+#     # Sorted in ascending order then choose the first n_songs
+#     index = list(np.argsort(distances)[:, :n_songs][0])
+#     # selecting the n_songs by index
+#     rec_songs = spotify_data.iloc[index]
+#     # removing the names of the songs which are present in the given list
+#     rec_songs = rec_songs[~rec_songs['name'].isin(song_dict['name'])]
+#     return rec_songs[metadata_cols].to_dict(orient='records')
+#%%
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+import numpy as np
 
-    # # Reshape scaled_song_center to be 2D
-    # scaled_song_center = scaled_song_center.reshape(-1, len(number_cols))
-
-    # distances = cdist(scaled_song_center, scaled_data, 'euclidean').flatten()
-    # sorted_indices = np.argsort(distances)
-    # index = sorted_indices[:n_songs]
-    # rec_songs = spotify_data.iloc[index]
-    # rec_songs = rec_songs[~rec_songs['name'].isin(song_dict['name'])]
-    # return rec_songs[metadata_cols].to_dict(orient='records')
-
+def recommend_songs(song_list, spotify_data, n_songs=10, sort_by='release_date'):
+    np.random.seed(42)  # Set the random seed for reproducibility
+    scaler = StandardScaler()
     metadata_cols = ['name', 'year', 'artists']
+    
     song_dict = flatten_dict_list(song_list)
     song_center = get_mean_vector(song_list, spotify_data)
-
-    # Calculate correlation between input features and song features
-    correlations = np.corrcoef(song_center, rowvar=False)[0]
-    recommendation_scores = np.sum(np.multiply(correlations, scaled_data), axis=1)
-
-
-    # Sort distances in ascending order
-    sorted_indices = np.argsort(recommendation_scores)[:n_songs]
-
+    
+    scaled_data = scaler.fit_transform(spotify_data[number_cols])
+    scaled_song_center = scaler.fit_transform(song_center.reshape(1, -1))
+    
+    # Using k-means clustering with k = n_songs
+    kmeans = KMeans(n_clusters=2*n_songs, random_state=42)
+    kmeans.fit(scaled_data)
+    
+    # Find the cluster to which the song center belongs
+    cluster_label = kmeans.predict(scaled_song_center)[0]
+    
+    # Get the indices of songs in the same cluster
+    index = list(np.where(kmeans.labels_ == cluster_label)[0])
+    
     # Selecting the n_songs by index
-    rec_songs = spotify_data.iloc[sorted_indices]
-
+    rec_songs = spotify_data.iloc[index]
+    
     # Removing the names of the songs which are present in the given list
     rec_songs = rec_songs[~rec_songs['name'].isin(song_dict['name'])]
-
-    return rec_songs[metadata_cols].to_dict(orient='records')
+    
+    # Sort the recommended songs by the specified criteria (e.g., popularity)
+    rec_songs = rec_songs.sort_values(by=sort_by, ascending=False)
+    
+    # Return the top 10 songs
+    rec_songs_top10 = rec_songs.head(n_songs)
+    
+    return rec_songs_top10[metadata_cols].to_dict(orient='records')
 
 # %%
 recommend_songs([{'name': 'Needed Me', 'year':2016},
@@ -135,6 +154,12 @@ recommend_songs([{'name': 'Needed Me', 'year':2016},
 
 
 
+#%%
+recommend_songs([{'name': 'Come As You Are', 'year':1991},
+                {'name': 'Smells Like Teen Spirit', 'year': 1991},
+                {'name': 'Lithium', 'year': 1992},
+                {'name': 'All Apologies', 'year': 1993},
+                {'name': 'Stay Away', 'year': 1993}],  data)
 
 
 
@@ -149,11 +174,11 @@ recommend_songs([{'name': 'Needed Me', 'year':2016},
 #     loaded_model = dill.load(file)
 
 # # Use the loaded function
-# result = loaded_model([{'name': 'you broke me first', 'year':2020},
-#                        {'name': 'Dynamite', 'year': 2000},
-#                        {'name': 'Therefore I Am', 'year': 2020},
-#                        {'name': 'WAP (feat. Megan Thee Stallion)', 'year': 2020},
-#                        {'name': 'Levitating (feat. DaBaby)', 'year': 2000}],  data)
+recommend_songs([{'name': 'Gati Bali', 'year':1921},
+                 {'name': 'Danny Boy', 'year':1921}],  data)
+
 # %%
 
+# %%
+data.head()
 # %%
