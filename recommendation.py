@@ -105,8 +105,13 @@ def flatten_dict_list(dict_list):
 #     # removing the names of the songs which are present in the given list
 #     rec_songs = rec_songs[~rec_songs['name'].isin(song_dict['name'])]
 #     return rec_songs[metadata_cols].to_dict(orient='records')
-
 #%%
+
+
+
+#### K Means Clustering ####
+
+
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
@@ -153,66 +158,118 @@ def recommend_songs(song_list, spotify_data, n_songs=10, sort_by='popularity'):
     
     return rec_songs_top10[metadata_cols].to_dict(orient='records')
 
-
 #%%
-from sklearn.mixture import GaussianMixture
-from sklearn.preprocessing import MinMaxScaler  # Use MinMaxScaler instead of StandardScaler
+
+########
+#### Self-Organizing Maps (SOM) ####
+
+#######
+from minisom import MiniSom
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 import numpy as np
 
-def recommend_songs(song_list, spotify_data, n_songs=10, sort_by='release_date'):
-    # np.random.seed(42)  # Set the random seed for reproducibility
-    scaler = MinMaxScaler()  # Use MinMaxScaler instead of StandardScaler
+def recommend_songs(song_list, spotify_data, n_songs=10, sort_by='year', som_seed=None):
+    np.random.seed(42)  # Set the random seed for reproducibility
     metadata_cols = ['name', 'year', 'artists']
-    
+
     song_dict = flatten_dict_list(song_list)
     song_center = get_mean_vector(song_list, spotify_data)
-    
+
+    # Use StandardScaler to scale the data
+    scaler = StandardScaler()
     scaled_data = scaler.fit_transform(spotify_data[number_cols])
-    scaled_song_center = scaler.fit_transform(song_center.reshape(1, -1))
+    scaled_song_center = scaler.transform(song_center.reshape(1, -1))
+
+    # Use PCA for dimensionality reduction
+    pca = PCA(n_components=len(spotify_data[number_cols].columns))
+    scaled_data_pca = pca.fit_transform(scaled_data)
+    scaled_song_center_pca = pca.transform(scaled_song_center)
+
+    # Using Self-Organizing Maps (SOM)
+    if som_seed is not None:
+        np.random.seed(som_seed)
+    som_size = (2 * n_songs, 2)
     
-    # Using Gaussian Mixture Models with n_components = n_songs
-    gmm = GaussianMixture(n_components=n_songs, random_state=42)
-    gmm.fit(scaled_data)
-    
-    # Find the cluster probabilities for the song center
-    cluster_probs = gmm.predict_proba(scaled_song_center)[0]
-    
-    # Choose the cluster with the highest probability
-    cluster_label = np.argmax(cluster_probs)
-   
-    # Get the indices of songs in the same cluster
-    index = list(np.where(gmm.predict(scaled_data) == cluster_label)[0])
-    
+    som = MiniSom(som_size[0], som_size[1], scaled_data_pca.shape[1], sigma=0.3, learning_rate=0.09)
+    som.train_random(scaled_data_pca, 1000)  # You may need to adjust the number of training iterations
+
+    # Find the best-matching unit (BMU) for the song center
+    bmu_coords = som.winner(scaled_song_center_pca)
+
+    # Get the indices of songs in the same cluster (considering 1D SOM)
+    index = [i for i, coords in enumerate(som.win_map(scaled_data_pca).get(bmu_coords, []))]
+
     # Selecting the n_songs by index
     rec_songs = spotify_data.iloc[index]
-    
+
     # Removing the names of the songs which are present in the given list
     rec_songs = rec_songs[~rec_songs['name'].isin(song_dict['name'])]
-    
+
     # Sort the recommended songs by the specified criteria (e.g., popularity)
     rec_songs = rec_songs.sort_values(by=sort_by, ascending=False)
-    
+
     # Return the top 10 songs
     rec_songs_top10 = rec_songs.head(n_songs)
-    
+
     return rec_songs_top10[metadata_cols].to_dict(orient='records')
+
+
+#%%
+# from sklearn.mixture import GaussianMixture
+# from sklearn.preprocessing import MinMaxScaler  # Use MinMaxScaler instead of StandardScaler
+# import numpy as np
+
+# def recommend_songs(song_list, spotify_data, n_songs=10, sort_by='release_date'):
+#     # np.random.seed(42)  # Set the random seed for reproducibility
+#     scaler = MinMaxScaler()  # Use MinMaxScaler instead of StandardScaler
+#     metadata_cols = ['name', 'year', 'artists']
+    
+#     song_dict = flatten_dict_list(song_list)
+#     song_center = get_mean_vector(song_list, spotify_data)
+    
+#     scaled_data = scaler.fit_transform(spotify_data[number_cols])
+#     scaled_song_center = scaler.fit_transform(song_center.reshape(1, -1))
+    
+#     # Using Gaussian Mixture Models with n_components = n_songs
+#     gmm = GaussianMixture(n_components=n_songs, random_state=42)
+#     gmm.fit(scaled_data)
+    
+#     # Find the cluster probabilities for the song center
+#     cluster_probs = gmm.predict_proba(scaled_song_center)[0]
+    
+#     # Choose the cluster with the highest probability
+#     cluster_label = np.argmax(cluster_probs)
+   
+#     # Get the indices of songs in the same cluster
+#     index = list(np.where(gmm.predict(scaled_data) == cluster_label)[0])
+    
+#     # Selecting the n_songs by index
+#     rec_songs = spotify_data.iloc[index]
+    
+#     # Removing the names of the songs which are present in the given list
+#     rec_songs = rec_songs[~rec_songs['name'].isin(song_dict['name'])]
+    
+#     # Sort the recommended songs by the specified criteria (e.g., popularity)
+#     rec_songs = rec_songs.sort_values(by=sort_by, ascending=False)
+    
+#     # Return the top 10 songs
+#     rec_songs_top10 = rec_songs.head(n_songs)
+    
+#     return rec_songs_top10[metadata_cols].to_dict(orient='records')
 
 # %%
 recommend_songs([{'name': 'Needed Me', 'year':2016},
                 {'name': 'Neighbors', 'year': 2016},
                 {'name': 'Feel No Ways', 'year': 2016},
                 {'name': 'Middle', 'year': 2016},
-                {'name': 'Try Everything', 'year': 2016}],  data)
+                {'name': 'Try Everything', 'year': 2016}],  data,som_seed=1)
 
 
 
 #%%
 
-recommend_songs([{'name': 'Come As You Are', 'year':1991},
-                {'name': 'Smells Like Teen Spirit', 'year': 1991},
-                {'name': 'Lithium', 'year': 1992},
-                {'name': 'All Apologies', 'year': 1993},
-                {'name': 'Stay Away', 'year': 1993}],  data)
+recommend_songs([{'name': 'Smells Like Teen Spirit', 'year': 1991}],  data,som_seed=1)
 
 #########################################################################################################################################################
 
@@ -249,5 +306,98 @@ data.columns
 
 # %%
 
+
+# %%
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+import numpy as np
+
+def collect_feedback():
+    positive_feedback = input("Enter positive feedback (comma-separated): ").split(',')
+    negative_feedback = input("Enter negative feedback (comma-separated): ").split(',')
+    return [feedback.strip() for feedback in positive_feedback], [feedback.strip() for feedback in negative_feedback]
+
+
+def get_mean_vector_with_feedback(song_dict, spotify_data):
+    """
+    Adjust the mean vector based on user feedback.
+    """
+    # Extract features and feedback from the song_dict
+    features = spotify_data[number_cols].values
+    positive_feedback = song_dict.get('positive_feedback', [])
+    negative_feedback = song_dict.get('negative_feedback', [])
+
+    # Calculate the mean vector based on feedback
+    if positive_feedback:
+        positive_vectors = features[spotify_data['name'].isin(positive_feedback)]
+        mean_positive_vector = np.mean(positive_vectors, axis=0)
+    else:
+        mean_positive_vector = np.zeros(features.shape[1])
+
+    if negative_feedback:
+        negative_vectors = features[spotify_data['name'].isin(negative_feedback)]
+        mean_negative_vector = np.mean(negative_vectors, axis=0)
+    else:
+        mean_negative_vector = np.zeros(features.shape[1])
+
+    # Combine positive and negative feedback to adjust the mean vector
+    adjusted_mean_vector = features.mean(axis=0) + mean_positive_vector - mean_negative_vector
+
+    return adjusted_mean_vector
+
+
+def recommend_songs(song_list, spotify_data, n_songs=10, sort_by='popularity'):
+    np.random.seed(42)  # Set the random seed for reproducibility
+    metadata_cols = ['name', 'year', 'artists']
+    
+    # Collect feedback from the user
+    positive_feedback, negative_feedback = collect_feedback()
+    
+    # Update song_dict with feedback
+    song_dict = flatten_dict_list(song_list)
+    song_dict['positive_feedback'] = positive_feedback
+    song_dict['negative_feedback'] = negative_feedback
+    
+    # Apply feedback to adjust the mean vector
+    song_center = get_mean_vector_with_feedback(song_dict, spotify_data)
+    
+    # Use StandardScaler to scale the data
+    scaler = StandardScaler()
+    scaled_data = scaler.fit_transform(spotify_data[number_cols])
+    scaled_song_center = scaler.transform(song_center.reshape(1, -1))
+    
+    # Use PCA for dimensionality reduction
+    pca = PCA(n_components=len(spotify_data[number_cols].columns))
+    scaled_data_pca = pca.fit_transform(scaled_data)
+    scaled_song_center_pca = pca.transform(scaled_song_center)
+    
+    # Using k-means clustering with k = n_songs
+    kmeans = KMeans(n_clusters=2 * n_songs, random_state=42)
+    kmeans.fit(scaled_data_pca)
+    
+    # Find the cluster to which the adjusted song center belongs
+    cluster_label = kmeans.predict(scaled_song_center_pca)[0]
+    
+    # Get the indices of songs in the same cluster
+    index = list(np.where(kmeans.labels_ == cluster_label)[0])
+    
+    # Selecting the n_songs by index
+    rec_songs = spotify_data.iloc[index]
+    
+    # Removing the names of the songs which are present in the given list
+    rec_songs = rec_songs[~rec_songs['name'].isin(song_dict['name'])]
+    
+    # Sort the recommended songs by the specified criteria (e.g., popularity)
+    rec_songs = rec_songs.sort_values(by=sort_by, ascending=False)
+    
+    # Return the top 10 songs
+    rec_songs_top10 = rec_songs.head(n_songs)
+    
+    return rec_songs_top10[metadata_cols].to_dict(orient='records')
+
+
+
+# %%
 
 # %%
