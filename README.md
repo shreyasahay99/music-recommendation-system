@@ -1,6 +1,6 @@
 # Music Recommendation System
 <p align="center">
-<img src="data/Music.png" width="400" height="350" title="StockSense" alt="StockSense Logo">
+<img src="data/Music.png" width="400" height="350" title="Music" alt="MusicREcom Logo">
 </p>
 
 ## Description
