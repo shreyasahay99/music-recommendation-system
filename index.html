@@ -106,6 +106,31 @@
     </div>
 
     <script>
+// Define the sendFeedback function outside getRecommendations
+        function sendFeedback(songName, feedback) {
+            const feedbackData = {
+                liked_songs: feedback === 'like' ? [songName] : [],
+                disliked_songs: feedback === 'dislike' ? [songName] : []
+            };
+
+            console.log("Sending feedback data:", feedbackData);
+
+            fetch("/send_feedback", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(feedbackData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log("Feedback sent successfully. Server response:", data);
+                // Update the UI or perform any additional actions
+            })
+            .catch(error => console.error("Error:", error));
+        }
+
+        // Define the getRecommendations function outside getRecommendations
         function getRecommendations() {
             // Get input values
             const songs = [
@@ -135,41 +160,11 @@
                         <p>${song.name} (${song.year}) by ${song.artists}</p>
                         <button type="button" onclick="sendFeedback('${song.name}', 'like')">Like</button>
                         <button type="button" onclick="sendFeedback('${song.name}', 'dislike')">Dislike</button>
-                `;
+                    `;
                 });
             })
             .catch(error => console.error("Error:", error));
-
-            function sendFeedback(songName, feedback) {
-                const feedbackData = {
-                    liked_songs: feedback === 'like' ? [songName] : [],
-                    disliked_songs: feedback === 'dislike' ? [songName] : []
-                };
-                fetch("/send_feedback", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify(feedbackData)
-                })
-                .then(response => response.json())
-                .then(data => {
-                 
-                    console.log("Feedback sent successfully:", data);
-
-
-                    document.querySelector(`button[data-song-id='${songId}'][data-feedback='${feedback}']`).disabled = true;
-        })
-        .catch(error => console.error("Error:", error));
-        }
-            function getInput(songId, yearId) {
-                return {
-                    name: document.getElementById(songId).value,
-                    year: parseInt(document.getElementById(yearId).value)
-                };
-        }
-    }
-
+}
     </script>
 </body>
 </html>
