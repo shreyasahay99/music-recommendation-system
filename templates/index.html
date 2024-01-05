@@ -1,19 +1,67 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Song Recommender</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            margin: 20px;
-        }
-    </style>
-</head>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Song Recommender</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                text-align: center;
+                margin: 20px;
+                background-color: #f5f5f5; /* Light gray background */
+            }
+    
+            h1 {
+                color: pink; /* Dark gray text color */
+            }
+    
+            form {
+                background-color: #fff; /* White background for the form */
+                padding: 20px;
+                border-radius: 10px; /* Rounded corners */
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); /* Box shadow for a subtle effect */
+                margin-bottom: 20px;
+            }
+    
+            label {
+                display: block;
+                margin-bottom: 10px;
+                color: #555; /* Gray text color for labels */
+            }
+    
+            input {
+                padding: 8px;
+                margin-bottom: 10px;
+                width: 100%;
+                box-sizing: border-box;
+                border: 1px solid #ccc; /* Light gray border */
+                border-radius: 5px; /* Rounded corners for input fields */
+            }
+    
+            button {
+                background-color: #4CAF50; /* Green button background color */
+                color: #fff; /* White text color */
+                padding: 10px 20px;
+                border: none;
+                border-radius: 5px; /* Rounded corners for the button */
+                cursor: pointer;
+            }
+    
+            #recommendations {
+                background-color: #fff; /* White background for recommendations */
+                padding: 20px;
+                border-radius: 10px; /* Rounded corners */
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); /* Box shadow for a subtle effect */
+            }
+    
+            p {
+                color: #333; /* Dark gray text color for recommendations */
+            }
+        </style>
+    </head>
 <body>
-    <h1>Song Recommender</h1>
+    <h1 class="h1">Song Recommender</h1>
     <form id="recommendForm">
         <label for="song1">Song 1 Name:</label>
         <input type="text" id="song1" name="song1" required>
@@ -81,12 +129,47 @@
                 // Display recommendations
                 const recommendationsDiv = document.getElementById("recommendations");
                 recommendationsDiv.innerHTML = "<h2>Recommendations:</h2>";
+                recommendationsDiv.innerHTML += "<h2>Feedback:</h2>";
                 data.forEach(song => {
-                    recommendationsDiv.innerHTML += `<p>${song.name} (${song.year}) by ${song.artists}</p>`;
+                    recommendationsDiv.innerHTML += `
+                        <p>${song.name} (${song.year}) by ${song.artists}</p>
+                        <button type="button" onclick="sendFeedback('${song.name}', 'like')">Like</button>
+                        <button type="button" onclick="sendFeedback('${song.name}', 'dislike')">Dislike</button>
+                `;
                 });
             })
             .catch(error => console.error("Error:", error));
+
+            function sendFeedback(songName, feedback) {
+                const feedbackData = {
+                    liked_songs: feedback === 'like' ? [songName] : [],
+                    disliked_songs: feedback === 'dislike' ? [songName] : []
+                };
+                fetch("/send_feedback", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(feedbackData)
+                })
+                .then(response => response.json())
+                .then(data => {
+                 
+                    console.log("Feedback sent successfully:", data);
+
+
+                    document.querySelector(`button[data-song-id='${songId}'][data-feedback='${feedback}']`).disabled = true;
+        })
+        .catch(error => console.error("Error:", error));
         }
+            function getInput(songId, yearId) {
+                return {
+                    name: document.getElementById(songId).value,
+                    year: parseInt(document.getElementById(yearId).value)
+                };
+        }
+    }
+
     </script>
 </body>
 </html>
