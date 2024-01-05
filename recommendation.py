@@ -111,10 +111,14 @@ def flatten_dict_list(dict_list):
 #### K Means Clustering ####
 
 
+#### K Means Clustering ####
+
+
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 import numpy as np
+
 
 def recommend_songs(song_list, spotify_data, n_songs=10, sort_by='popularity'):
     np.random.seed(42)  # Set the random seed for reproducibility
@@ -156,7 +160,6 @@ def recommend_songs(song_list, spotify_data, n_songs=10, sort_by='popularity'):
     rec_songs_top10 = rec_songs.head(n_songs)
     
     return rec_songs_top10[metadata_cols].to_dict(orient='records')
-
 #%%
 
 ########
@@ -398,5 +401,28 @@ import numpy as np
 
 
 # %%
+# def retrain_kmeans_model(data, user_feedback):
+#     # Extract numerical features for clustering
+#     number_cols = ['valence', 'year', 'acousticness', 'danceability', 'duration_ms', 'energy', 'explicit',
+#                    'instrumentalness', 'key', 'liveness', 'loudness', 'mode', 'popularity', 'speechiness', 'tempo']
+#     features = data[number_cols]
 
+#     # Include user feedback in training data
+#     user_liked_data = data[data['name'].isin(user_feedback['liked_songs'])][number_cols]
+#     user_disliked_data = data[data['name'].isin(user_feedback['disliked_songs'])][number_cols]
+#     training_data = pd.concat([features, user_liked_data, user_disliked_data], axis=0)
+
+#     # Standardize features
+#     scaler = StandardScaler()
+#     scaled_data = scaler.fit_transform(training_data)
+
+#     # Apply PCA for dimensionality reduction
+#     pca = PCA(n_components=len(number_cols))
+#     scaled_data_pca = pca.fit_transform(scaled_data)
+
+#     # Retrain k-means model
+#     kmeans = KMeans(n_clusters=2 * 10, random_state=42)
+#     kmeans.fit(scaled_data_pca)
+
+#     return kmeans, scaler, pca
 # %%
