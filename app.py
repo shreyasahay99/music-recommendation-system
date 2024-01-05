@@ -8,7 +8,8 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler
 from scipy.spatial.distance import cdist
 from collections import defaultdict
-
+from sklearn.decomposition import PCA
+from sklearn.cluster import KMeans
 #%%
 def flatten_dict_list(dict_list):
     
@@ -53,6 +54,10 @@ def get_mean_vector(song_list, spotify_data):
 #%%
 
 app = Flask(__name__)
+
+user_feedback = {'liked_songs': [], 'disliked_songs': []}
+
+
 CORS(app, resources={r"/": {"origins": "*"}})
 # Load the recommendation function
 with open('song_model.pkl', 'rb') as file:
@@ -78,8 +83,28 @@ def get_recommendations():
 
         # Return recommendations as JSON
         return jsonify(recommendations)
+    
+
+@app.route('/send_feedback', methods=['POST'])
+def send_feedback():
+    global user_feedback
+    feedback_data = request.get_json()
+
+    print("Received Feedback Data:", feedback_data)
+    
+    # Store feedback in the dictionary
+    user_feedback['liked_songs'].extend(feedback_data.get('liked_songs', []))
+    user_feedback['disliked_songs'].extend(feedback_data.get('disliked_songs', []))
+
+    print("Updated User Feedback:", user_feedback)
+    
+    # Return a confirmation response
+    return jsonify({'status': 'Feedback received successfully'})
+
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, port=5001)
 
+# %%
+user_feedback
 # %%
