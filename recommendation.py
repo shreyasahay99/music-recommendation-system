@@ -10,17 +10,17 @@ import matplotlib.pyplot as plt
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.cluster import KMeans
+
 from sklearn.metrics import silhouette_score
 import pickle
 
 #%% [markdown]
 ## Data Import
 #%%
-data = pd.read_csv("/Users/shreya/Documents/GitHub/DATS-6103-FA-23-SEC-11/music-recommendation-system/data/data.csv")
-data_by_artist = pd.read_csv("/Users/shreya/Documents/GitHub/DATS-6103-FA-23-SEC-11/music-recommendation-system/data/data_by_artist.csv")
-data_by_year=pd.read_csv("/Users/shreya/Documents/GitHub/DATS-6103-FA-23-SEC-11/music-recommendation-system/data/data_by_year.csv")
-data_by_genre=pd.read_csv("/Users/shreya/Documents/GitHub/DATS-6103-FA-23-SEC-11/music-recommendation-system/data/data_by_genres.csv")
+data = pd.read_csv("/Users/richikghosh/Documents/GitHub/music-recommendation-system/data/data.csv")
+data_by_artist = pd.read_csv("/Users/richikghosh/Documents/GitHub/music-recommendation-system/data/data_by_artist.csv")
+data_by_year=pd.read_csv("/Users/richikghosh/Documents/GitHub/music-recommendation-system/data/data_by_year.csv")
+data_by_genre=pd.read_csv("/Users/richikghosh/Documents/GitHub/music-recommendation-system/data/data_by_genres.csv")
 #data_wt_genre=pd.read_csv("/Users/richikghosh/Documents/GitHub/music-recommendation-system/data/data_w_genres.csv")
 #%%
 
@@ -106,60 +106,69 @@ def flatten_dict_list(dict_list):
 #     return rec_songs[metadata_cols].to_dict(orient='records')
 #%%
 
+def adjust_weights_based_on_feedback(index, user_feedback):
+    liked_songs = user_feedback['liked_songs']
+    disliked_songs = user_feedback['disliked_songs']
 
+    weights = np.ones(len(index))  # Initialize weights to 1
 
-#### K Means Clustering ####
+    for liked_song in liked_songs:
+        if liked_song in index:
+            weights[index.index(liked_song)] *= 10  # Increase the weight for liked songs
 
+    for disliked_song in disliked_songs:
+        if disliked_song in index:
+            weights[index.index(disliked_song)] *= -0.0  # Decrease the weight for disliked songs
 
-#### K Means Clustering ####
+    # Normalize weights to sum to 1
+    weights /= np.sum(weights)
 
+    return weights
 
-from sklearn.cluster import KMeans
-from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
-import numpy as np
-
-
-def recommend_songs(song_list, spotify_data, n_songs=10, sort_by='popularity'):
+def recommend_songs(song_list, spotify_data, user_feedback, n_songs=10, sort_by='popularity'):
     np.random.seed(42)  # Set the random seed for reproducibility
     metadata_cols = ['name', 'year', 'artists']
-    
+
     song_dict = flatten_dict_list(song_list)
     song_center = get_mean_vector(song_list, spotify_data)
-    
+
     # Use StandardScaler to scale the data
     scaler = StandardScaler()
     scaled_data = scaler.fit_transform(spotify_data[number_cols])
     scaled_song_center = scaler.transform(song_center.reshape(1, -1))
-    
+
     # Use PCA for dimensionality reduction
     pca = PCA(n_components=len(spotify_data[number_cols].columns))
     scaled_data_pca = pca.fit_transform(scaled_data)
     scaled_song_center_pca = pca.transform(scaled_song_center)
-    
+
     # Using k-means clustering with k = n_songs
     kmeans = KMeans(n_clusters=2 * n_songs, random_state=42)
     kmeans.fit(scaled_data_pca)
-    
+
     # Find the cluster to which the song center belongs
     cluster_label = kmeans.predict(scaled_song_center_pca)[0]
-    
+
     # Get the indices of songs in the same cluster
     index = list(np.where(kmeans.labels_ == cluster_label)[0])
-    
-    # Selecting the n_songs by index
+    # Adjust the weights based on user feedback
+    adjusted_weights = adjust_weights_based_on_feedback(index, user_feedback)
+
+    # Selecting the n_songs by index with adjusted weights
     rec_songs = spotify_data.iloc[index]
-    
+
+    rec_songs['adjusted_score'] = rec_songs[sort_by] * adjusted_weights
+
     # Removing the names of the songs which are present in the given list
     rec_songs = rec_songs[~rec_songs['name'].isin(song_dict['name'])]
-    
-    # Sort the recommended songs by the specified criteria (e.g., popularity)
-    rec_songs = rec_songs.sort_values(by=sort_by, ascending=False)
-    
-    # Return the top 10 songs
-    rec_songs_top10 = rec_songs.head(n_songs)
-    
-    return rec_songs_top10[metadata_cols].to_dict(orient='records')
+
+    # Sort the recommended songs by the adjusted score
+    rec_songs = rec_songs.sort_values(by='adjusted_score', ascending=False)
+
+    # Return the top n_songs
+    rec_songs_top_n = rec_songs.head(n_songs)
+
+    return rec_songs_top_n[metadata_cols].to_dict(orient='records')
 #%%
 
 ########
@@ -259,19 +268,20 @@ import numpy as np
 #     rec_songs_top10 = rec_songs.head(n_songs)
     
 #     return rec_songs_top10[metadata_cols].to_dict(orient='records')
-
+#%%
+user_feedback = {'liked_songs': [], 'disliked_songs': []}
 # %%
 recommend_songs([{'name': 'Needed Me', 'year':2016},
                 {'name': 'Neighbors', 'year': 2016},
                 {'name': 'Feel No Ways', 'year': 2016},
                 {'name': 'Middle', 'year': 2016},
-                {'name': 'Try Everything', 'year': 2016}],  data)
+                {'name': 'Try Everything', 'year': 2016}],  data,user_feedback)
 
 
 
 #%%
 
-recommend_songs([{'name': 'Smells Like Teen Spirit', 'year': 1991}],  data)
+recommend_songs([{'name': 'Smells Like Teen Spirit', 'year': 1991}],  data,user_feedback)
 
 #########################################################################################################################################################
 
@@ -284,15 +294,15 @@ with open('song_model.pkl', 'wb') as file:
 #     loaded_model = dill.load(file)
 
 # # Use the loaded function
-recommend_songs([{'name': 'Come Back To Erin', 'year':1921},
-                 {'name': 'When We Die', 'year':1921}],  data)
+# recommend_songs([{'name': 'Come Back To Erin', 'year':1921},
+#                  {'name': 'When We Die', 'year':1921}],  data)
 
 # %%
-recommend_songs([{'name': 'Sweater Weather', 'year':2013},
-                {'name': 'Pompeii', 'year': 2013},
-                {'name': 'You Know You Like It', 'year': 2014},
-                {'name': 'Gucci Gang', 'year': 2017},
-                {'name': 'I <3 My Choppa', 'year': 2017}],  data)
+# recommend_songs([{'name': 'Sweater Weather', 'year':2013},
+#                 {'name': 'Pompeii', 'year': 2013},
+#                 {'name': 'You Know You Like It', 'year': 2014},
+#                 {'name': 'Gucci Gang', 'year': 2017},
+#                 {'name': 'I <3 My Choppa', 'year': 2017}],  data)
 
 # %%
 data.columns
@@ -400,29 +410,5 @@ import numpy as np
 
 
 
-# %%
-# def retrain_kmeans_model(data, user_feedback):
-#     # Extract numerical features for clustering
-#     number_cols = ['valence', 'year', 'acousticness', 'danceability', 'duration_ms', 'energy', 'explicit',
-#                    'instrumentalness', 'key', 'liveness', 'loudness', 'mode', 'popularity', 'speechiness', 'tempo']
-#     features = data[number_cols]
 
-#     # Include user feedback in training data
-#     user_liked_data = data[data['name'].isin(user_feedback['liked_songs'])][number_cols]
-#     user_disliked_data = data[data['name'].isin(user_feedback['disliked_songs'])][number_cols]
-#     training_data = pd.concat([features, user_liked_data, user_disliked_data], axis=0)
-
-#     # Standardize features
-#     scaler = StandardScaler()
-#     scaled_data = scaler.fit_transform(training_data)
-
-#     # Apply PCA for dimensionality reduction
-#     pca = PCA(n_components=len(number_cols))
-#     scaled_data_pca = pca.fit_transform(scaled_data)
-
-#     # Retrain k-means model
-#     kmeans = KMeans(n_clusters=2 * 10, random_state=42)
-#     kmeans.fit(scaled_data_pca)
-
-#     return kmeans, scaler, pca
 # %%
