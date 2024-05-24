@@ -23,6 +23,10 @@ After this the closest songs to the list provided are selected and presented to 
 
 We have used Flask to built the webpage of the recommendation system.
 
+## Future scope
+
+- We are planning to use LLM for music generation
+
 
 
 
